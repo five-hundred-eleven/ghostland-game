@@ -12,6 +12,9 @@
 
 #include <iostream>
 #include <filesystem>
+#include <vector>
+
+#include "collisions.h"
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
@@ -46,6 +49,68 @@ const char *modelC = "model";
 const char *viewposC = "viewPos";
 const char *lightcolorC = "lightColor";
 const char *objectcolorC = "objectColor";
+
+int num_walls;
+float *wall_vertices;
+
+glm::vec3 getNormalFromIndex(int ix) {
+    return glm::vec3(
+        wall_vertices[ix * 6 * 6 + 3],
+        wall_vertices[ix * 6 * 6 + 4],
+        wall_vertices[ix * 6 * 6 + 5]
+    );
+}
+
+glm::vec3 getVec3FromIndices(int ix, int jx) {
+    return glm::vec3(
+        wall_vertices[ix * 6 * 6 + jx * 6],
+        wall_vertices[ix * 6 * 6 + jx * 6 + 1],
+        wall_vertices[ix * 6 * 6 + jx * 6 + 2]
+    );
+}
+
+glm::vec3 checkIntersection(glm::vec3 movement) {
+
+    glm::vec3 vec_start, vec_stop, p1, p2, p3, res;
+    int gotX = 0, gotZ = 0;
+    vec_start = player_pos;
+    vec_stop = vec_start + movement * 10.0f;
+    res.x = movement.x;
+    res.y = movement.y;
+    res.z = movement.z;
+
+    for (int ix = 0; ix < num_walls; ix++) {
+        glm::vec3 norm = getNormalFromIndex(ix);
+        if (gotX && gotZ) {
+            break;
+        }
+        if (!gotX) {
+            if ((movement.x > 0 && norm.x < 0) || (movement.x < 0 && norm.x > 0)) {
+                p1 = getVec3FromIndices(ix, 1);
+                p2 = getVec3FromIndices(ix, 0);
+                p3 = getVec3FromIndices(ix, 2);
+                if (getIntersection(vec_start, vec_stop, p1, p2, p3)) {
+                    gotX = 1;
+                    res.x = -movement.x;
+                }
+            }
+        }
+        if (!gotZ) {
+            if ((movement.z > 0 && norm.z < 0) || (movement.z < 0 && norm.z > 0)) {
+                p1 = getVec3FromIndices(ix, 1);
+                p2 = getVec3FromIndices(ix, 0);
+                p3 = getVec3FromIndices(ix, 2);
+                if (getIntersection(vec_start, vec_stop, p1, p2, p3)) {
+                    gotZ = 1;
+                    res.z = -movement.z;
+                }
+            }
+        }
+    }
+
+    return res;
+
+}
 
 int main()
 {
@@ -154,14 +219,13 @@ int main()
 
     fp = fopen("maze.txt", "r");
     fscanf(fp, "%f %f %f %f\n", &player_pos.x, &player_pos.y, &player_pos.z, &yaw);
-    int num_surfaces;
-    fscanf(fp, "%d\n", &num_surfaces);
+    fscanf(fp, "%d\n", &num_walls);
     // num surfaces * 6 (vertices per point) * 6 (floats per point)
     // add 1 for floor
-    int num_walls = (num_surfaces) * 6 * 6;
-    float *wall_vertices = (float *)calloc(sizeof(float), num_surfaces * 6 * 6);
+    int num_walls = (num_walls) * 6 * 6;
+    wall_vertices = (float *)calloc(sizeof(float), num_walls * 6 * 6);
     // read walls
-    for (int i = 0; i < num_surfaces; i++) {
+    for (int i = 0; i < num_walls; i++) {
         for (int j = 0; j < 6; j++) {
             int vix = i*6*6 + j*6;
             fscanf(
@@ -272,7 +336,7 @@ int main()
         glBindVertexArray(wallsVAO);
         glDrawArrays(GL_TRIANGLES, 0, num_walls);
 
-        glm::vec3 floor_color = glm::vec3(0.1f, 0.1f, 0.1f);
+        glm::vec3 floor_color = glm::vec3(0.0f, 0.0f, 0.0f);
         glUniform3fv(glGetUniformLocation(program, objectcolorC), 1, &floor_color[0]);
 
         glBindVertexArray(floorVAO);
@@ -301,19 +365,20 @@ void processInput(GLFWwindow *window)
     glm::vec3 movement;
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
         movement = glm::vec3(camera_front.x, 0.0, camera_front.z);
-        player_pos += glm::normalize(movement) * camera_speed_adjusted;
     } else if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
         movement = glm::vec3(-camera_front.x, 0.0, -camera_front.z);
-        player_pos += glm::normalize(movement) * camera_speed_adjusted;
     } else if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
         glm::vec3 right = glm::cross(camera_front, camera_up);
         movement = glm::vec3(right.x, 0.0, right.z);
-        player_pos -= glm::normalize(movement) * camera_speed_adjusted;
     } else if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
         glm::vec3 right = glm::cross(camera_front, camera_up);
         movement = glm::vec3(right.x, 0.0, right.z);
-        player_pos += glm::normalize(movement) * camera_speed_adjusted;
+    } else {
+        return;
     }
+    movement = glm::normalize(movement) * camera_speed_adjusted;
+    movement = checkIntersection(movement);
+    player_pos += movement;
 }
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
