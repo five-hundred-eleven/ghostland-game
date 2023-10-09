@@ -22,8 +22,8 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
 
 // settings
-const unsigned int WINDOWWIDTH = 1280;
-const unsigned int WINDOWHEIGHT = 720;
+const unsigned int WINDOWWIDTH = 1600;
+const unsigned int WINDOWHEIGHT = 900;
 
 // camera
 glm::vec3 player_pos   = glm::vec3(0.0f, 0.0f, 3.0f);
@@ -31,7 +31,7 @@ glm::vec3 camera_front = glm::vec3(0.0f, 0.0f, -1.0f);
 glm::vec3 camera_up    = glm::vec3(0.0f, 1.0f, 0.0f);
 
 bool first_mouse = true;
-float yaw   = -90.0f;
+float yaw   = 0.0f;
 float pitch =  0.0f;
 float lastX =  WINDOWWIDTH / 2.0;
 float lastY =  WINDOWHEIGHT / 2.0;
@@ -49,6 +49,7 @@ const char *modelC = "model";
 const char *viewposC = "viewPos";
 const char *lightcolorC = "lightColor";
 const char *objectcolorC = "objectColor";
+const char *lightstrengthC = "lightStrength";
 
 int num_walls;
 float *wall_vertices;
@@ -74,7 +75,7 @@ glm::vec3 checkIntersection(glm::vec3 movement) {
     glm::vec3 vec_start, vec_stop, p1, p2, p3, res;
     int gotX = 0, gotZ = 0;
     vec_start = player_pos;
-    vec_stop = vec_start + movement * 10.0f;
+    vec_stop = vec_start + movement * 20.0f;
     res.x = movement.x;
     res.y = movement.y;
     res.z = movement.z;
@@ -119,7 +120,7 @@ int main()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    GLFWwindow* window = glfwCreateWindow(WINDOWWIDTH, WINDOWHEIGHT, "LearnOpenGL", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(WINDOWWIDTH, WINDOWHEIGHT, "Snowland!", NULL, NULL);
     if (window == NULL)
     {
         printf("Failed to create GLFW window.\n");
@@ -198,15 +199,28 @@ int main()
         return -1;
     }
 
-    int program = glCreateProgram();
-    glAttachShader(program, vertex_shader);
-    glAttachShader(program, fragment_shader);
-    glLinkProgram(program);
-    glGetProgramiv(program, GL_LINK_STATUS, &success);
+    int wall_program = glCreateProgram();
+    glAttachShader(wall_program, vertex_shader);
+    glAttachShader(wall_program, fragment_shader);
+    glLinkProgram(wall_program);
+    glGetProgramiv(wall_program, GL_LINK_STATUS, &success);
     if (!success) {
         char infoLog[1024];
-        glGetProgramInfoLog(program, 1024, NULL, infoLog);
-        printf("Shader program link error: %s\n", infoLog);
+        glGetProgramInfoLog(wall_program, 1024, NULL, infoLog);
+        printf("Shader wall_program link error: %s\n", infoLog);
+        glfwTerminate();
+        return -1;
+    }
+
+    int floor_program = glCreateProgram();
+    glAttachShader(floor_program, vertex_shader);
+    glAttachShader(floor_program, fragment_shader);
+    glLinkProgram(floor_program);
+    glGetProgramiv(floor_program, GL_LINK_STATUS, &success);
+    if (!success) {
+        char infoLog[1024];
+        glGetProgramInfoLog(floor_program, 1024, NULL, infoLog);
+        printf("Shader floor_program link error: %s\n", infoLog);
         glfwTerminate();
         return -1;
     }
@@ -221,9 +235,8 @@ int main()
     fscanf(fp, "%f %f %f %f\n", &player_pos.x, &player_pos.y, &player_pos.z, &yaw);
     fscanf(fp, "%d\n", &num_walls);
     // num surfaces * 6 (vertices per point) * 6 (floats per point)
-    // add 1 for floor
-    int num_walls = (num_walls) * 6 * 6;
-    wall_vertices = (float *)calloc(sizeof(float), num_walls * 6 * 6);
+    int num_wall_vertices = num_walls * 6 * 6;
+    wall_vertices = (float *)calloc(sizeof(float), num_wall_vertices);
     // read walls
     for (int i = 0; i < num_walls; i++) {
         for (int j = 0; j < 6; j++) {
@@ -266,7 +279,7 @@ int main()
     glBindVertexArray(wallsVAO);
 
     glBindBuffer(GL_ARRAY_BUFFER, wallsVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * num_walls, wall_vertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * num_wall_vertices, wall_vertices, GL_STATIC_DRAW);
 
     // position attribute
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
@@ -314,30 +327,40 @@ int main()
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glUseProgram(program);
+        glUseProgram(wall_program);
 
         glm::mat4 projection = glm::perspective(glm::radians(fov), (float)WINDOWWIDTH / (float)WINDOWHEIGHT, 0.1f, 256.0f);
-        glUniformMatrix4fv(glGetUniformLocation(program, projectionC), 1, GL_FALSE, &projection[0][0]);
+        glUniformMatrix4fv(glGetUniformLocation(wall_program, projectionC), 1, GL_FALSE, &projection[0][0]);
 
         glm::mat4 view = glm::lookAt(player_pos, player_pos + camera_front, camera_up);
-        glUniformMatrix4fv(glGetUniformLocation(program, viewC), 1, GL_FALSE, &view[0][0]);
+        glUniformMatrix4fv(glGetUniformLocation(wall_program, viewC), 1, GL_FALSE, &view[0][0]);
 
-        glm::vec3 wall_color = glm::vec3(0.5f, 0.5f, 0.5f);
-        glUniform3fv(glGetUniformLocation(program, objectcolorC), 1, &wall_color[0]);
+        glm::vec3 wall_color = glm::vec3(0.61f, 0.6f, 0.59f);
+        glUniform3fv(glGetUniformLocation(wall_program, objectcolorC), 1, &wall_color[0]);
 
         glm::vec3 light_color = glm::vec3(1.0f, 1.0f, 1.0f);
-        glUniform3fv(glGetUniformLocation(program, lightcolorC), 1, &light_color[0]);
+        glUniform3fv(glGetUniformLocation(wall_program, lightcolorC), 1, &light_color[0]);
 
-        glUniform3fv(glGetUniformLocation(program, viewposC), 1, &player_pos[0]);
+        glUniform3fv(glGetUniformLocation(wall_program, viewposC), 1, &player_pos[0]);
 
         glm::mat4 model = glm::mat4(1.0f);
-        glUniformMatrix4fv(glGetUniformLocation(program, modelC), 1, GL_FALSE, &model[0][0]);
+        glUniformMatrix4fv(glGetUniformLocation(wall_program, modelC), 1, GL_FALSE, &model[0][0]);
 
         glBindVertexArray(wallsVAO);
-        glDrawArrays(GL_TRIANGLES, 0, num_walls);
+        glDrawArrays(GL_TRIANGLES, 0, num_wall_vertices);
 
-        glm::vec3 floor_color = glm::vec3(0.0f, 0.0f, 0.0f);
-        glUniform3fv(glGetUniformLocation(program, objectcolorC), 1, &floor_color[0]);
+        glUseProgram(floor_program);
+
+        glUniformMatrix4fv(glGetUniformLocation(floor_program, projectionC), 1, GL_FALSE, &projection[0][0]);
+        glUniformMatrix4fv(glGetUniformLocation(floor_program, viewC), 1, GL_FALSE, &view[0][0]);
+        glUniformMatrix4fv(glGetUniformLocation(floor_program, modelC), 1, GL_FALSE, &model[0][0]);
+        glUniform3fv(glGetUniformLocation(floor_program, viewposC), 1, &player_pos[0]);
+
+        glm::vec3 floor_color = glm::vec3(0.11f, 0.1f, 0.09f);
+        glUniform3fv(glGetUniformLocation(floor_program, objectcolorC), 1, &floor_color[0]);
+
+        glm::vec3 floor_light_color = glm::vec3(1.0f, 1.0f, 1.0f);
+        glUniform3fv(glGetUniformLocation(floor_program, lightcolorC), 1, &floor_light_color[0]);
 
         glBindVertexArray(floorVAO);
         glDrawArrays(GL_TRIANGLES, 0, 6 * 6 * 1);
