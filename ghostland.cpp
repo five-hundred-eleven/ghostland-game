@@ -193,11 +193,11 @@ int main()
 
     glEnable(GL_DEPTH_TEST);
 
-    int vertex_shader = createShader("vertexshader.txt", GL_VERTEX_SHADER);
+    int vertex_shader = createShader("vertexshader.glsl", GL_VERTEX_SHADER);
     if (vertex_shader < 0) {
         return -1;
     }
-    int fragment_shader = createShader("fragmentshader.txt", GL_FRAGMENT_SHADER);
+    int fragment_shader = createShader("fragmentshader.glsl", GL_FRAGMENT_SHADER);
     if (fragment_shader < 0) {
         return -1;
     }
@@ -314,11 +314,11 @@ int main()
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *)0);
     glEnableVertexAttribArray(0);
 
-    int trail_shader = createShader("trailshader.txt", GL_VERTEX_SHADER);
+    int trail_shader = createShader("trailshader.glsl", GL_VERTEX_SHADER);
     if (trail_shader < 0) {
         return -1;
     }
-    int trailfrag_shader = createShader("trailfragshader.txt", GL_FRAGMENT_SHADER);
+    int trailfrag_shader = createShader("trailfragshader.glsl", GL_FRAGMENT_SHADER);
     if (trailfrag_shader < 0) {
         return -1;
     }
