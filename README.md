@@ -3,4 +3,4 @@ This is a continuation of my [goland-game](https://github.com/five-hundred-eleve
 
 While the previous project was implemented in go, for this project I was not able to get the go bindings for OpenGL working, and so I went with C++.
 
-![snowland](https://stromsy.com/content/snowland_5.gif)
+![gameplay capture](https://stromsy.com/content/ghostland_3.gif)
