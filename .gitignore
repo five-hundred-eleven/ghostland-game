@@ -22,6 +22,7 @@ go.work
 
 *.o
 *.swp
+ghostland
 
 # you can download these from the internet
 stb_image.c
