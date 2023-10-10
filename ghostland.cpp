@@ -15,11 +15,15 @@
 
 #include "collisions.h"
 
+glm::vec3 getNormalFromIndex(int ix);
+glm::vec3 getVec3FromIndices(int ix, int jx);
+glm::vec3 checkIntersection(glm::vec3 movement);
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
 int createShader(const char *filename, int shadertype);
+void set_light_front(int xoffset, int yoffset);
 
 // settings
 const unsigned int WINDOWWIDTH = 1600;
@@ -30,6 +34,14 @@ glm::vec3 player_pos   = glm::vec3(0.0f, 0.0f, 3.0f);
 glm::vec3 camera_front = glm::vec3(0.0f, 0.0f, -1.0f);
 glm::vec3 camera_up    = glm::vec3(0.0f, 1.0f, 0.0f);
 glm::vec3 light_pos  = glm::vec3(0.0f, 0.0f, 0.0f);
+glm::vec3 light_front = glm::vec3(0.0f, 0.0f, -1.0f);
+
+bool mousemove = false;
+const float lightoffsetmax = 15.0f;
+float xpersist = 0.0f;
+float ypersist = 0.0f;
+float persist_factor = 0.99f;
+float offset_factor = 0.01f;
 
 bool first_mouse = true;
 float yaw   = 0.0f;
@@ -65,66 +77,7 @@ float *wall_vertices;
 
 int trailmax = 1800;
 
-glm::vec3 getNormalFromIndex(int ix) {
-    return glm::vec3(
-        wall_vertices[ix * 6 * 6 + 3],
-        wall_vertices[ix * 6 * 6 + 4],
-        wall_vertices[ix * 6 * 6 + 5]
-    );
-}
-
-glm::vec3 getVec3FromIndices(int ix, int jx) {
-    return glm::vec3(
-        wall_vertices[ix * 6 * 6 + jx * 6],
-        wall_vertices[ix * 6 * 6 + jx * 6 + 1],
-        wall_vertices[ix * 6 * 6 + jx * 6 + 2]
-    );
-}
-
-glm::vec3 checkIntersection(glm::vec3 movement) {
-
-    glm::vec3 vec_start, vec_stop, p1, p2, p3, res;
-    int gotX = 0, gotZ = 0;
-    vec_start = player_pos;
-    vec_stop = vec_start + movement * 20.0f;
-    res.x = movement.x;
-    res.y = movement.y;
-    res.z = movement.z;
-
-    for (int ix = 0; ix < num_walls; ix++) {
-        glm::vec3 norm = getNormalFromIndex(ix);
-        if (gotX && gotZ) {
-            break;
-        }
-        if (!gotX) {
-            if ((movement.x > 0 && norm.x < 0) || (movement.x < 0 && norm.x > 0)) {
-                p1 = getVec3FromIndices(ix, 1);
-                p2 = getVec3FromIndices(ix, 0);
-                p3 = getVec3FromIndices(ix, 2);
-                if (getIntersection(vec_start, vec_stop, p1, p2, p3)) {
-                    gotX = 1;
-                    res.x = -movement.x;
-                }
-            }
-        }
-        if (!gotZ) {
-            if ((movement.z > 0 && norm.z < 0) || (movement.z < 0 && norm.z > 0)) {
-                p1 = getVec3FromIndices(ix, 1);
-                p2 = getVec3FromIndices(ix, 0);
-                p3 = getVec3FromIndices(ix, 2);
-                if (getIntersection(vec_start, vec_stop, p1, p2, p3)) {
-                    gotZ = 1;
-                    res.z = -movement.z;
-                }
-            }
-        }
-    }
-
-    return res;
-
-}
-
-int main()
+int main(int argc, char *argv[])
 {
 
     int success;
@@ -376,6 +329,8 @@ int main()
         timed = current_frame - last_frame;
         last_frame = current_frame;
 
+        mousemove = false;
+
         processInput(window);
 
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
@@ -393,16 +348,19 @@ int main()
         glUniformMatrix4fv(glGetUniformLocation(wall_program, modelC), 1, GL_FALSE, &model[0][0]);
 
         // light position
-        light_pos.x = player_pos.x + 0.5 * cos(glm::radians(yaw + 45.0f)) * cos(glm::radians(pitch));
-        light_pos.y = player_pos.y + 0.5 * sin(glm::radians(pitch));
-        light_pos.z = player_pos.z + 0.5 * sin(glm::radians(yaw + 45.0f)) * cos(glm::radians(pitch));
+        float armlength = 0.50f;
+        float yawoffset = 90.0f;
+        float pitchoffset = -30.0f;
+        light_pos.x = player_pos.x + armlength * cos(glm::radians(yaw + yawoffset)) * cos(glm::radians(pitch + pitchoffset));
+        light_pos.y = player_pos.y + armlength * sin(glm::radians(pitch + pitchoffset));
+        light_pos.z = player_pos.z + armlength * sin(glm::radians(yaw + yawoffset)) * cos(glm::radians(pitch + pitchoffset));
 
         // fragment requirements
         glUniform3fv(glGetUniformLocation(wall_program, viewposC), 1, &player_pos[0]);
         glUniform1f(glGetUniformLocation(wall_program, shininessC), wall_shininess);
         glUniform3fv(glGetUniformLocation(wall_program, colorC), 1, &wall_color[0]);
         glUniform3fv(glGetUniformLocation(wall_program, lightposC), 1, &light_pos[0]);
-        glUniform3fv(glGetUniformLocation(wall_program, directionC), 1, &camera_front[0]);
+        glUniform3fv(glGetUniformLocation(wall_program, directionC), 1, &light_front[0]);
         glUniform1f(glGetUniformLocation(wall_program, largecutoffC), largecutoff);
         glUniform1f(glGetUniformLocation(wall_program, smallcutoffC), smallcutoff);
         glUniform3fv(glGetUniformLocation(wall_program, ambientC), 1, &ambient[0]);
@@ -424,7 +382,7 @@ int main()
         glUniform1f(glGetUniformLocation(floor_program, shininessC), floor_shininess);
         glUniform3fv(glGetUniformLocation(floor_program, colorC), 1, &floor_color[0]);
         glUniform3fv(glGetUniformLocation(floor_program, lightposC), 1, &light_pos[0]);
-        glUniform3fv(glGetUniformLocation(floor_program, directionC), 1, &camera_front[0]);
+        glUniform3fv(glGetUniformLocation(floor_program, directionC), 1, &light_front[0]);
         glUniform1f(glGetUniformLocation(floor_program, largecutoffC), largecutoff);
         glUniform1f(glGetUniformLocation(floor_program, smallcutoffC), smallcutoff);
         glUniform3fv(glGetUniformLocation(floor_program, ambientC), 1, &ambient[0]);
@@ -453,6 +411,10 @@ int main()
 
         glfwSwapBuffers(window);
         glfwPollEvents();
+
+        if (!mousemove) {
+            set_light_front(0.0f, 0.0f); 
+        }
 
     }
 
@@ -498,6 +460,9 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 
 void mouse_callback(GLFWwindow* window, double xpos_in, double ypos_in)
 {
+
+    mousemove = true;
+
     float xpos = static_cast<float>(xpos_in);
     float ypos = static_cast<float>(ypos_in);
 
@@ -517,6 +482,7 @@ void mouse_callback(GLFWwindow* window, double xpos_in, double ypos_in)
     xoffset *= sensitivity;
     yoffset *= sensitivity;
 
+    float prev_yaw = yaw;
     yaw += xoffset;
     pitch += yoffset;
 
@@ -529,7 +495,9 @@ void mouse_callback(GLFWwindow* window, double xpos_in, double ypos_in)
     front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
     front.y = sin(glm::radians(pitch));
     front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
-    camera_front = glm::normalize(front);
+    camera_front = normalize(front);
+
+    set_light_front(xoffset, yoffset);
 
 }
 
@@ -573,4 +541,89 @@ int createShader(const char *filename, int shadertype) {
         return -1;
     }
     return shader;
+}
+
+glm::vec3 getNormalFromIndex(int ix) {
+    return glm::vec3(
+        wall_vertices[ix * 6 * 6 + 3],
+        wall_vertices[ix * 6 * 6 + 4],
+        wall_vertices[ix * 6 * 6 + 5]
+    );
+}
+
+glm::vec3 getVec3FromIndices(int ix, int jx) {
+    return glm::vec3(
+        wall_vertices[ix * 6 * 6 + jx * 6],
+        wall_vertices[ix * 6 * 6 + jx * 6 + 1],
+        wall_vertices[ix * 6 * 6 + jx * 6 + 2]
+    );
+}
+
+glm::vec3 checkIntersection(glm::vec3 movement) {
+
+    glm::vec3 vec_start, vec_stop, p1, p2, p3, res;
+    int gotX = 0, gotZ = 0;
+    vec_start = player_pos;
+    vec_stop = vec_start + movement * 20.0f;
+    res.x = movement.x;
+    res.y = movement.y;
+    res.z = movement.z;
+
+    for (int ix = 0; ix < num_walls; ix++) {
+        glm::vec3 norm = getNormalFromIndex(ix);
+        if (gotX && gotZ) {
+            break;
+        }
+        if (!gotX) {
+            if ((movement.x > 0 && norm.x < 0) || (movement.x < 0 && norm.x > 0)) {
+                p1 = getVec3FromIndices(ix, 1);
+                p2 = getVec3FromIndices(ix, 0);
+                p3 = getVec3FromIndices(ix, 2);
+                if (getIntersection(vec_start, vec_stop, p1, p2, p3)) {
+                    gotX = 1;
+                    res.x = -movement.x;
+                }
+            }
+        }
+        if (!gotZ) {
+            if ((movement.z > 0 && norm.z < 0) || (movement.z < 0 && norm.z > 0)) {
+                p1 = getVec3FromIndices(ix, 1);
+                p2 = getVec3FromIndices(ix, 0);
+                p3 = getVec3FromIndices(ix, 2);
+                if (getIntersection(vec_start, vec_stop, p1, p2, p3)) {
+                    gotZ = 1;
+                    res.z = -movement.z;
+                }
+            }
+        }
+    }
+
+    return res;
+
+}
+
+void set_light_front(int xoffset, int yoffset) {
+
+    xoffset *= 128.0f;
+    yoffset *= 128.0f;
+
+    xpersist = xpersist * persist_factor + xoffset * offset_factor;
+    if (xpersist > lightoffsetmax) {
+        xpersist = lightoffsetmax;
+    } else if (xpersist < -lightoffsetmax) {
+        xpersist = -lightoffsetmax;
+    }
+    ypersist = ypersist * persist_factor + yoffset * offset_factor;
+    if (ypersist > lightoffsetmax) {
+        ypersist = lightoffsetmax;
+    } else if (ypersist < -lightoffsetmax) {
+        ypersist = -lightoffsetmax;
+    }
+    float yawp = yaw + xpersist;
+    float pitchp = pitch + ypersist;
+    glm::vec3 front;
+    front.x = cos(glm::radians(yawp)) * cos(glm::radians(pitchp));
+    front.y = sin(glm::radians(pitchp));
+    front.z = sin(glm::radians(yawp)) * cos(glm::radians(pitchp));
+    light_front = normalize(front);
 }

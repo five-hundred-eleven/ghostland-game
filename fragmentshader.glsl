@@ -32,8 +32,8 @@ void main()
 
     // check if lighting is inside the spotlight cone
     float theta = dot(lightDir, normalize(-light.direction));
-
     float co = clamp((theta - light.largecutoff) / (light.smallcutoff - light.largecutoff), 0.0, 1.0);
+
     // diffuse
     vec3 norm = normalize(Normal);
     float diff = max(dot(norm, lightDir), 0.0);
