@@ -1,5 +1,5 @@
-ghostland: glad.o ghostland.o stb_image.o collisions.o
-	g++ -o ghostland glad.o ghostland.o stb_image.o collisions.o -ldl -lglfw -std=c++17 -O3
+ghostland: glad.o ghostland.o stb_image.o collisions.o player.o
+	g++ -o ghostland glad.o ghostland.o stb_image.o collisions.o player.o -ldl -lglfw -std=c++17 -O3
 
 glad.o: glad.c
 	g++ -c -o glad.o glad.c -O3
@@ -12,6 +12,9 @@ stb_image.o: stb_image.c
 
 collisions.o: collisions.cpp
 	g++ -c -o collisions.o collisions.cpp -std=c++17 -O3
+
+player.o: player.cpp
+	g++ -c -o player.o player.cpp -std=c++17 -O3
 
 clean:
 	rm -f *.o ghostland

@@ -14,7 +14,7 @@ int signbit(float x) {
     return 0;
 }
 
-int getIntersection(glm::vec3 vec_start, glm::vec3 vec_stop, glm::vec3 P1, glm::vec3 P2, glm::vec3 P3) {
+int get_intersection(glm::vec3 vec_start, glm::vec3 vec_stop, glm::vec3 P1, glm::vec3 P2, glm::vec3 P3) {
 
     glm::vec3 lba = vec_start - vec_stop;
     glm::vec3 v01 = P2 - P1;
