@@ -1,20 +1,27 @@
-ghostland: glad.o ghostland.o stb_image.o collisions.o player.o
-	g++ -o ghostland glad.o ghostland.o stb_image.o collisions.o player.o -ldl -lglfw -std=c++17 -O3
+CC := g++
+CFLAGS := -std=c++17 -O3
+LDFLAGS := -ldl -lglfw
+
+ghostland: glad.o ghostland.o stb_image.o collisions.o player.o shader.o
+	$(CC) -o ghostland glad.o ghostland.o stb_image.o collisions.o player.o shader.o $(LDFLAGS) $(CFLAGS)
 
 glad.o: glad.c
-	g++ -c -o glad.o glad.c -O3
+	$(CC) -c -o glad.o glad.c $(CFLAGS)
 
 ghostland.o: ghostland.cpp
-	g++ -c -o ghostland.o ghostland.cpp -std=c++17 -O3
+	$(CC) -c -o ghostland.o ghostland.cpp $(CFLAGS)
 
 stb_image.o: stb_image.c
-	g++ -c -o stb_image.o stb_image.c -std=c++17 -O3
+	$(CC) -c -o stb_image.o stb_image.c $(CFLAGS)
 
-collisions.o: collisions.cpp
-	g++ -c -o collisions.o collisions.cpp -std=c++17 -O3
+collisions.o: collisions.cpp collisions.h
+	$(CC) -c -o collisions.o collisions.cpp $(CFLAGS)
 
-player.o: player.cpp
-	g++ -c -o player.o player.cpp -std=c++17 -O3
+player.o: player.cpp player.h
+	$(CC) -c -o player.o player.cpp $(CFLAGS)
+
+shader.o: shader.cpp shader.h
+	$(CC) -c -o shader.o shader.cpp $(CFLAGS)
 
 clean:
 	rm -f *.o ghostland

@@ -17,7 +17,6 @@ const float hvelocity = 10.0;
 
 class Player {
 
-
     public:
 
         Player(glm::vec3 startpos, float startyaw);

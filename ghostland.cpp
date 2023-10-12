@@ -15,11 +15,11 @@
 
 #include "collisions.h"
 #include "player.h"
+#include "shader.h"
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
-int createShader(const char *filename, int shadertype);
 void set_light_front(int xoffset, int yoffset);
 
 // player
@@ -159,43 +159,18 @@ int main(int argc, char *argv[])
 
     glEnable(GL_DEPTH_TEST);
 
-    int vertex_shader = createShader("vertexshader.glsl", GL_VERTEX_SHADER);
-    if (vertex_shader < 0) {
-        return -1;
-    }
-    int fragment_shader = createShader("fragmentshader.glsl", GL_FRAGMENT_SHADER);
-    if (fragment_shader < 0) {
-        return -1;
-    }
-
-    int wall_program = glCreateProgram();
-    glAttachShader(wall_program, vertex_shader);
-    glAttachShader(wall_program, fragment_shader);
-    glLinkProgram(wall_program);
-    glGetProgramiv(wall_program, GL_LINK_STATUS, &success);
-    if (!success) {
-        char infoLog[1024];
-        glGetProgramInfoLog(wall_program, 1024, NULL, infoLog);
-        printf("Shader wall_program link error: %s\n", infoLog);
+    int wall_program = create_shader_program("vertexshader.glsl", "fragmentshader.glsl");
+    if (wall_program < 0) {
         glfwTerminate();
         return -1;
     }
 
-    int floor_program = glCreateProgram();
-    glAttachShader(floor_program, vertex_shader);
-    glAttachShader(floor_program, fragment_shader);
-    glLinkProgram(floor_program);
-    glGetProgramiv(floor_program, GL_LINK_STATUS, &success);
-    if (!success) {
-        char infoLog[1024];
-        glGetProgramInfoLog(floor_program, 1024, NULL, infoLog);
-        printf("Shader floor_program link error: %s\n", infoLog);
+    // Perhaps there's a better way of doing this, rather than re-compiling the same files?
+    int floor_program = create_shader_program("vertexshader.glsl", "fragmentshader.glsl");
+    if (wall_program < 0) {
         glfwTerminate();
         return -1;
     }
-
-    glDeleteShader(vertex_shader);
-    glDeleteShader(fragment_shader);
 
     // do stuff for walls
     unsigned int wallsVBO, wallsVAO;
@@ -260,24 +235,8 @@ int main(int argc, char *argv[])
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *)0);
     glEnableVertexAttribArray(0);
 
-    int trail_shader = createShader("trailshader.glsl", GL_VERTEX_SHADER);
-    if (trail_shader < 0) {
-        return -1;
-    }
-    int trailfrag_shader = createShader("trailfragshader.glsl", GL_FRAGMENT_SHADER);
-    if (trailfrag_shader < 0) {
-        return -1;
-    }
-
-    int trail_program = glCreateProgram();
-    glAttachShader(trail_program, trail_shader);
-    glAttachShader(trail_program, trailfrag_shader);
-    glLinkProgram(trail_program);
-    glGetProgramiv(trail_program, GL_LINK_STATUS, &success);
-    if (!success) {
-        char infoLog[1024];
-        glGetProgramInfoLog(wall_program, 1024, NULL, infoLog);
-        printf("Shader trail_program link error: %s\n", infoLog);
+    int trail_program = create_shader_program("trailshader.glsl", "trailfragshader.glsl");
+    if (trail_program < 0) {
         glfwTerminate();
         return -1;
     }
@@ -287,6 +246,7 @@ int main(int argc, char *argv[])
     int trail_ix = 0;
     int trail_sz = 0;
 
+    // TODO move these into config file??
     int time_secI = 0, num_frames = 1;
     float time_sec;
     glm::vec3 wall_color = glm::vec3(0.61f, 0.6f, 0.59f);
@@ -340,7 +300,7 @@ int main(int argc, char *argv[])
 
         float fov = player->get_fov();
         glm::mat4 projection = glm::perspective(glm::radians(fov), (float)WINDOWWIDTH / (float)WINDOWHEIGHT, 0.1f, 256.0f);
-        glUniformMatrix4fv(glGetUniformLocation(wall_program, projectionC), 1, GL_FALSE, &projection[0][0]);
+        set_uniform(wall_program, projectionC, projection);
 
         glm::vec3 camera_pos, camera_front, camera_up;
         camera_pos = player->get_camera_pos();
@@ -348,10 +308,10 @@ int main(int argc, char *argv[])
         camera_up = player->get_camera_up();
 
         glm::mat4 view = glm::lookAt(camera_pos, camera_pos + camera_front, camera_up);
-        glUniformMatrix4fv(glGetUniformLocation(wall_program, viewC), 1, GL_FALSE, &view[0][0]);
+        set_uniform(wall_program, viewC, view);
 
         glm::mat4 model = glm::mat4(1.0f);
-        glUniformMatrix4fv(glGetUniformLocation(wall_program, modelC), 1, GL_FALSE, &model[0][0]);
+        set_uniform(wall_program, modelC, model);
 
         // light position
         glm::vec3 light_pos = player->get_light_pos();
@@ -360,54 +320,53 @@ int main(int argc, char *argv[])
         //printf("light_pos: (%f, %f, %f)\n", light_front.x, light_front.y, light_front.z);
 
         // fragment requirements
-        glUniform3fv(glGetUniformLocation(wall_program, viewposC), 1, &camera_pos[0]);
-        glUniform1f(glGetUniformLocation(wall_program, shininessC), wall_shininess);
-        glUniform3fv(glGetUniformLocation(wall_program, colorC), 1, &wall_color[0]);
-        glUniform3fv(glGetUniformLocation(wall_program, lightposC), 1, &light_pos[0]);
-        glUniform3fv(glGetUniformLocation(wall_program, directionC), 1, &light_front[0]);
-        glUniform1f(glGetUniformLocation(wall_program, largecutoffC), largecutoff);
-        glUniform1f(glGetUniformLocation(wall_program, smallcutoffC), smallcutoff);
-        glUniform3fv(glGetUniformLocation(wall_program, ambientC), 1, &ambient[0]);
-        glUniform3fv(glGetUniformLocation(wall_program, diffuseC), 1, &diffuse[0]);
-        glUniform3fv(glGetUniformLocation(wall_program, specularC), 1, &specular[0]);
+        set_uniform(wall_program, viewposC, camera_pos);
+        set_uniform(wall_program, shininessC, wall_shininess);
+        set_uniform(wall_program, colorC, wall_color);
+        set_uniform(wall_program, lightposC, light_pos);
+        set_uniform(wall_program, directionC, light_front);
+        set_uniform(wall_program, largecutoffC, largecutoff);
+        set_uniform(wall_program, smallcutoffC, smallcutoff);
+        set_uniform(wall_program, ambientC, ambient);
+        set_uniform(wall_program, diffuseC, diffuse);
+        set_uniform(wall_program, specularC, specular);
 
         glBindVertexArray(wallsVAO);
         glDrawArrays(GL_TRIANGLES, 0, num_wall_vertices);
 
         glUseProgram(floor_program);
 
-        glUniformMatrix4fv(glGetUniformLocation(floor_program, projectionC), 1, GL_FALSE, &projection[0][0]);
-        glUniformMatrix4fv(glGetUniformLocation(floor_program, viewC), 1, GL_FALSE, &view[0][0]);
-        glUniformMatrix4fv(glGetUniformLocation(floor_program, modelC), 1, GL_FALSE, &model[0][0]);
-        glUniform3fv(glGetUniformLocation(floor_program, viewposC), 1, &camera_pos[0]);
+        set_uniform(floor_program, projectionC, projection);
+        set_uniform(floor_program, viewC, view);
+        set_uniform(floor_program, modelC, model);
+        set_uniform(floor_program, viewposC, camera_pos);
 
         // fragment requirements
-        glUniform3fv(glGetUniformLocation(floor_program, viewposC), 1, &camera_pos[0]);
-        glUniform1f(glGetUniformLocation(floor_program, shininessC), floor_shininess);
-        glUniform3fv(glGetUniformLocation(floor_program, colorC), 1, &floor_color[0]);
-        glUniform3fv(glGetUniformLocation(floor_program, lightposC), 1, &light_pos[0]);
-        glUniform3fv(glGetUniformLocation(floor_program, directionC), 1, &light_front[0]);
-        glUniform1f(glGetUniformLocation(floor_program, largecutoffC), largecutoff);
-        glUniform1f(glGetUniformLocation(floor_program, smallcutoffC), smallcutoff);
-        glUniform3fv(glGetUniformLocation(floor_program, ambientC), 1, &ambient[0]);
-        glUniform3fv(glGetUniformLocation(floor_program, diffuseC), 1, &diffuse[0]);
-        glUniform3fv(glGetUniformLocation(floor_program, specularC), 1, &specular[0]);
+        set_uniform(floor_program, shininessC, floor_shininess);
+        set_uniform(floor_program, colorC, floor_color);
+        set_uniform(floor_program, lightposC, light_pos);
+        set_uniform(floor_program, directionC, light_front);
+        set_uniform(floor_program, largecutoffC, largecutoff);
+        set_uniform(floor_program, smallcutoffC, smallcutoff);
+        set_uniform(floor_program, ambientC, ambient);
+        set_uniform(floor_program, diffuseC, diffuse);
+        set_uniform(floor_program, specularC, specular);
 
         glBindVertexArray(floorVAO);
         glDrawArrays(GL_TRIANGLES, 0, 6 * 6 * 1);
 
         glUseProgram(trail_program);
 
-        glUniformMatrix4fv(glGetUniformLocation(trail_program, projectionC), 1, GL_FALSE, &projection[0][0]);
-        glUniformMatrix4fv(glGetUniformLocation(trail_program, viewC), 1, GL_FALSE, &view[0][0]);
+        set_uniform(trail_program, projectionC, projection);
+        set_uniform(trail_program, viewC, view);
         glm::vec3 trail_color = glm::vec3(1.0f, 0.0f, 0.0f);
-        glUniform3fv(glGetUniformLocation(trail_program, objectcolorC), 1, &trail_color[0]);
+        set_uniform(trail_program, objectcolorC, trail_color);
 
         for (int i = 0; i < trail_sz; i++) {
             glm::mat4 model = glm::mat4(1.0f);
             model = glm::translate(model, trail_positions[i]);
             model = glm::rotate(model, glm::radians(trail_angles[i]), glm::vec3(0.0f, -1.0f, 0.0f));
-            glUniformMatrix4fv(glGetUniformLocation(trail_program, modelC), 1, GL_FALSE, &model[0][0]);
+            set_uniform(trail_program, modelC, model);
             glBindVertexArray(trailVAO);
 
             glDrawArrays(GL_TRIANGLES, 0, 3 * 3 * 3);
@@ -433,39 +392,6 @@ int main(int argc, char *argv[])
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
     glViewport(0, 0, width, height);
-}
-
-int createShader(const char *filename, int shadertype) {
-    FILE* fp = fopen(filename, "r");
-    if (!fp) {
-        printf("failed to open vertex shader!\n");
-        return -1;
-    }
-    fseek(fp, 0L, SEEK_END);
-    unsigned int buffer_sz = ftell(fp);
-    rewind(fp);
-
-    char *buffer = (char *)calloc(sizeof(char), buffer_sz + 1);
-    if (fread(buffer, buffer_sz, 1, fp) != 1) {
-        printf("failed to read vertex shader!\n");
-        return -1;
-    }
-    fclose(fp);
-
-    int shader = glCreateShader(shadertype);
-    glShaderSource(shader, 1, &buffer, NULL);
-    free(buffer);
-    glCompileShader(shader);
-    int success;
-    glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
-    if (!success) {
-        char info_log[1024];
-        glGetShaderInfoLog(shader, 1024, NULL, info_log);
-        printf("Shader compile error for %s: %s\n", filename, info_log);
-        glfwTerminate();
-        return -1;
-    }
-    return shader;
 }
 
 void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
