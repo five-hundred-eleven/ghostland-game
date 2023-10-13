@@ -2,8 +2,8 @@ CC := g++
 CFLAGS := -std=c++17 -O3
 LDFLAGS := -ldl -lglfw
 
-ghostland: glad.o ghostland.o stb_image.o collisions.o player.o shader.o
-	$(CC) -o ghostland glad.o ghostland.o stb_image.o collisions.o player.o shader.o $(LDFLAGS) $(CFLAGS)
+ghostland: glad.o ghostland.o stb_image.o collisions.o player.o shader.o ghost.o
+	$(CC) -o ghostland glad.o ghostland.o stb_image.o collisions.o player.o shader.o ghost.o $(LDFLAGS) $(CFLAGS)
 
 glad.o: glad.c
 	$(CC) -c -o glad.o glad.c $(CFLAGS)
@@ -22,6 +22,9 @@ player.o: player.cpp player.h
 
 shader.o: shader.cpp shader.h
 	$(CC) -c -o shader.o shader.cpp $(CFLAGS)
+
+ghost.o: ghost.cpp ghost.h
+	$(CC) -c -o ghost.o ghost.cpp $(CFLAGS)
 
 clean:
 	rm -f *.o ghostland

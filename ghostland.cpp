@@ -16,6 +16,7 @@
 #include "collisions.h"
 #include "player.h"
 #include "shader.h"
+#include "ghost.h"
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
@@ -87,6 +88,7 @@ int main(int argc, char *argv[])
     // num surfaces * 6 (vertices per point) * 6 (floats per point)
     int num_wall_vertices = num_walls * 6 * 6;
     wall_vertices = (float *)calloc(sizeof(float), num_wall_vertices);
+    int xmin_wall, xmax_wall, zmin_wall, zmax_wall;
     // read walls
     for (int i = 0; i < num_walls; i++) {
         for (int j = 0; j < 6; j++) {
@@ -103,6 +105,16 @@ int main(int argc, char *argv[])
             ) == EOF) {
                 printf("3rd fscanf failed.\n");
                 return -1;
+            }
+            if (wall_vertices[vix] < xmin_wall) {
+                xmin_wall = wall_vertices[vix];
+            } else if (wall_vertices[vix] > xmax_wall) {
+                xmax_wall = wall_vertices[vix];
+            }
+            if (wall_vertices[vix + 2] < zmin_wall) {
+                zmin_wall = wall_vertices[vix + 2];
+            } else if (wall_vertices[vix + 2] > zmax_wall) {
+                zmax_wall = wall_vertices[vix + 2];
             }
         }
         if (fscanf(fp, "\n") == EOF) {
@@ -145,7 +157,7 @@ int main(int argc, char *argv[])
         return -1;
     }
     glfwMakeContextCurrent(window);
-    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+    //glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
     glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetScrollCallback(window, scroll_callback);
 
@@ -158,6 +170,9 @@ int main(int argc, char *argv[])
     }
 
     glEnable(GL_DEPTH_TEST);
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     int wall_program = create_shader_program("vertexshader.glsl", "fragmentshader.glsl");
     if (wall_program < 0) {
@@ -246,6 +261,57 @@ int main(int argc, char *argv[])
     int trail_ix = 0;
     int trail_sz = 0;
 
+    // do stuff for ghosts
+    // create program
+    int ghost_program = create_shader_program("ghostshader.glsl", "ghostfragshader.glsl");
+    if (ghost_program < 0) {
+        glfwTerminate();
+        return -1;
+    }
+    // ghost vertices
+    float ghost_vertices[] = {
+        -0.5f, -0.5f, -0.5f,  0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+         0.5f, -0.5f, -0.5f,  0.0f, 0.0f, 1.0f, 1.0f, 0.0f,
+         0.5f,  0.5f, -0.5f,  0.0f, 0.0f, 1.0f, 1.0f, 1.0f,
+         0.5f,  0.5f, -0.5f,  0.0f, 0.0f, 1.0f, 1.0f, 1.0f,
+        -0.5f,  0.5f, -0.5f,  0.0f, 0.0f, 1.0f, 0.0f, 1.0f,
+        -0.5f, -0.5f, -0.5f,  0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+    };
+    unsigned int ghostVBO, ghostVAO;
+    glGenVertexArrays(1, &ghostVAO);
+    glBindVertexArray(ghostVAO);
+    glGenBuffers(1, &ghostVBO);
+    glBindBuffer(GL_ARRAY_BUFFER, ghostVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(ghost_vertices), ghost_vertices, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *)0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *)(6 * sizeof(float)));
+    glEnableVertexAttribArray(2);
+    // ghost texture
+    unsigned int ghost_texture;
+    glGenTextures(1, &ghost_texture);
+    glBindTexture(GL_TEXTURE_2D, ghost_texture);
+    // set the texture wrapping parameters
+    //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_);
+    //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    // set texture filtering parameters
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    int width, height, numberChannels;
+    //stbi_set_flip_vertically_on_load(true);
+    unsigned char *ghost_data = stbi_load("ghost_facing_right.png", &width, &height, &numberChannels, 0);
+    printf("Num channels: %d\n", numberChannels);
+    if (!ghost_data) {
+        printf("Failed to load texture!\n");
+        glfwTerminate();
+        return -1;
+    }
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, ghost_data);
+    glGenerateMipmap(GL_TEXTURE_2D);
+    stbi_image_free(ghost_data);
+
     // TODO move these into config file??
     int time_secI = 0, num_frames = 1;
     float time_sec;
@@ -259,6 +325,11 @@ int main(int argc, char *argv[])
 
     float largecutoff = glm::cos(glm::radians(30.0f));
     float smallcutoff = glm::cos(glm::radians(7.5f));
+
+    std::vector<Ghost *> ghosts;
+    for (int i = 0; i < 4000; i++) {
+        ghosts.push_back(new Ghost(xmin_wall, xmax_wall, zmin_wall, zmax_wall));
+    }
 
     while (!glfwWindowShouldClose(window))
     {
@@ -368,8 +439,22 @@ int main(int argc, char *argv[])
             model = glm::rotate(model, glm::radians(trail_angles[i]), glm::vec3(0.0f, -1.0f, 0.0f));
             set_uniform(trail_program, modelC, model);
             glBindVertexArray(trailVAO);
-
             glDrawArrays(GL_TRIANGLES, 0, 3 * 3 * 3);
+        }
+
+        glUseProgram(ghost_program);
+        
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, ghost_texture);
+
+        set_uniform(ghost_program, projectionC, projection);
+        set_uniform(ghost_program, viewC, view);
+        for (int i = 0; i < ghosts.size(); i++) {
+            glm::mat4 ghost_model = ghosts[i]->get_model(camera_pos);
+            ghosts[i]->apply_movement();
+            set_uniform(ghost_program, modelC, ghost_model);
+            glBindVertexArray(ghostVAO);
+            glDrawArrays(GL_TRIANGLES, 0, (3 + 3 + 2) * 6);
         }
 
         player->apply_movement();
@@ -389,8 +474,7 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-void framebuffer_size_callback(GLFWwindow* window, int width, int height)
-{
+void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
     glViewport(0, 0, width, height);
 }
 
