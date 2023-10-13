@@ -327,7 +327,7 @@ int main(int argc, char *argv[])
     float smallcutoff = glm::cos(glm::radians(7.5f));
 
     std::vector<Ghost *> ghosts;
-    for (int i = 0; i < 4000; i++) {
+    for (int i = 0; i < 1000; i++) {
         ghosts.push_back(new Ghost(xmin_wall, xmax_wall, zmin_wall, zmax_wall));
     }
 
