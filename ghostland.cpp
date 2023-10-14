@@ -333,6 +333,8 @@ int main(int argc, char *argv[])
         ghosts.push_back(new Ghost(xmin_wall, xmax_wall, zmin_wall, zmax_wall));
     }
 
+    player->mouse_callback(window, WINDOWWIDTH/2, WINDOWHEIGHT/2);
+
     while (!glfwWindowShouldClose(window))
     {
         float current_frame = static_cast<float>(glfwGetTime());

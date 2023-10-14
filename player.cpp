@@ -6,9 +6,9 @@
 Player::Player(glm::vec3 startpos, float startyaw) {
 
     position = startpos;
-    yaw = 45.0f + startyaw;
+    yaw = startyaw;
 
-    pitch = 45.0f;
+    pitch = 0.0f;
     first_mouse = false;
     first_frame = false;
     light_xpersist = 0.0f;
