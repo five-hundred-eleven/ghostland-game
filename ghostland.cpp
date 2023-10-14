@@ -27,20 +27,11 @@ void set_light_front(int xoffset, int yoffset);
 Player *player;
 
 // settings
-const unsigned int WINDOWWIDTH = 1600;
-const unsigned int WINDOWHEIGHT = 900;
+unsigned int WINDOWWIDTH = 1600;
+unsigned int WINDOWHEIGHT = 900;
 
 // camera
-bool mousemove = false;
-float xpersist = 0.0f;
-float ypersist = 0.0f;
-
-bool first_mouse = true;
-float yaw   = 0.0f;
-float pitch =  0.0f;
-float lastX =  WINDOWWIDTH / 2.0;
-float lastY =  WINDOWHEIGHT / 2.0;
-
+bool first_frame = false;
 float timed = 0.0f;
 float last_frame = 0.0f;
 
@@ -88,7 +79,11 @@ int main(int argc, char *argv[])
     // num surfaces * 6 (vertices per point) * 6 (floats per point)
     int num_wall_vertices = num_walls * 6 * 6;
     wall_vertices = (float *)calloc(sizeof(float), num_wall_vertices);
-    int xmin_wall, xmax_wall, zmin_wall, zmax_wall;
+    float xmin_wall, xmax_wall, zmin_wall, zmax_wall;
+    xmin_wall = 9999.9;
+    xmax_wall = -9999.9;
+    zmin_wall = 9999.9;
+    zmax_wall = -9999.9;
     // read walls
     for (int i = 0; i < num_walls; i++) {
         for (int j = 0; j < 6; j++) {
@@ -149,7 +144,13 @@ int main(int argc, char *argv[])
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    GLFWwindow* window = glfwCreateWindow(WINDOWWIDTH, WINDOWHEIGHT, "Ghostland!", NULL, NULL);
+    GLFWmonitor *monitor = glfwGetPrimaryMonitor();
+    const GLFWvidmode *monitor_mode = glfwGetVideoMode(monitor);
+
+    WINDOWWIDTH = monitor_mode->width;
+    WINDOWHEIGHT = monitor_mode->height;
+
+    GLFWwindow* window = glfwCreateWindow(WINDOWWIDTH, WINDOWHEIGHT, "Ghostland!", monitor, NULL);
     if (window == NULL)
     {
         printf("Failed to create GLFW window.\n");
@@ -166,6 +167,7 @@ int main(int argc, char *argv[])
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
         printf("Failed to initialize GLAD.\n");
+        glfwTerminate();
         return -1;
     }
 
@@ -270,12 +272,12 @@ int main(int argc, char *argv[])
     }
     // ghost vertices
     float ghost_vertices[] = {
-        -0.5f, -0.5f, -0.5f,  0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
-         0.5f, -0.5f, -0.5f,  0.0f, 0.0f, 1.0f, 1.0f, 0.0f,
-         0.5f,  0.5f, -0.5f,  0.0f, 0.0f, 1.0f, 1.0f, 1.0f,
-         0.5f,  0.5f, -0.5f,  0.0f, 0.0f, 1.0f, 1.0f, 1.0f,
-        -0.5f,  0.5f, -0.5f,  0.0f, 0.0f, 1.0f, 0.0f, 1.0f,
-        -0.5f, -0.5f, -0.5f,  0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+        -0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+         0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f,
+         0.5f,  0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f,
+         0.5f,  0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f,
+        -0.5f,  0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f,
+        -0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
     };
     unsigned int ghostVBO, ghostVAO;
     glGenVertexArrays(1, &ghostVAO);
@@ -327,7 +329,7 @@ int main(int argc, char *argv[])
     float smallcutoff = glm::cos(glm::radians(7.5f));
 
     std::vector<Ghost *> ghosts;
-    for (int i = 0; i < 1000; i++) {
+    for (int i = 0; i < 800; i++) {
         ghosts.push_back(new Ghost(xmin_wall, xmax_wall, zmin_wall, zmax_wall));
     }
 
@@ -359,8 +361,10 @@ int main(int argc, char *argv[])
         }
         timed = current_frame - last_frame;
         last_frame = current_frame;
-
-        mousemove = false;
+        if (!first_frame) {
+            first_frame = true;
+            continue;
+        }
 
         player->process_input(window);
 
@@ -451,13 +455,13 @@ int main(int argc, char *argv[])
         set_uniform(ghost_program, viewC, view);
         for (int i = 0; i < ghosts.size(); i++) {
             glm::mat4 ghost_model = ghosts[i]->get_model(camera_pos);
-            ghosts[i]->apply_movement();
+            ghosts[i]->apply_movement(current_frame, timed);
             set_uniform(ghost_program, modelC, ghost_model);
             glBindVertexArray(ghostVAO);
             glDrawArrays(GL_TRIANGLES, 0, (3 + 3 + 2) * 6);
         }
 
-        player->apply_movement();
+        player->apply_movement(timed);
 
         glfwSwapBuffers(window);
         glfwPollEvents();

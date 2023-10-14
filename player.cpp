@@ -6,9 +6,9 @@
 Player::Player(glm::vec3 startpos, float startyaw) {
 
     position = startpos;
-    yaw = startyaw;
+    yaw = 45.0f + startyaw;
 
-    pitch = 0.0f;
+    pitch = 45.0f;
     first_mouse = false;
     first_frame = false;
     light_xpersist = 0.0f;
@@ -203,18 +203,7 @@ void Player::set_light_offset(float xoffset, float yoffset) {
 
 }
 
-void Player::apply_movement() {
-
-    float curr_time = static_cast<float>(glfwGetTime());
-
-    if (!first_frame) {
-        prev_move_time = curr_time;
-        first_frame = true;
-        return;
-    }
-
-    float diff_time = curr_time - prev_move_time;
-    prev_move_time = curr_time;
+void Player::apply_movement(float timed) {
 
     // mouse movement
     glm::vec3 front;
@@ -230,7 +219,7 @@ void Player::apply_movement() {
 
     // positional movement
     glm::vec3 movement = velocity;
-    movement *= diff_time;
+    movement *= timed;
     glm::vec3 intersected = check_intersection(movement);
     if (is_in_air()) {
         if (intersected.x == 0.0) {
@@ -253,7 +242,7 @@ void Player::apply_movement() {
         position.y = 0.0f;
         velocity.y = 0.0f;
     } else {
-        velocity.y += diff_time * vacceleration;
+        velocity.y += timed * vacceleration;
     }
 
     position.x += intersected.x;

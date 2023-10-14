@@ -38,7 +38,7 @@ class Player {
         void process_input(GLFWwindow *window);
         void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
         bool is_in_air();
-        void apply_movement();
+        void apply_movement(float timed);
 
     private:
         float yaw;
