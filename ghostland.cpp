@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+
 #include <stb_image.h>
 
 #include <glm/glm.hpp>
@@ -17,6 +18,7 @@
 #include "player.h"
 #include "shader.h"
 #include "ghost.h"
+#include "text.h"
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
@@ -172,7 +174,7 @@ int main(int argc, char *argv[])
     }
 
     glEnable(GL_DEPTH_TEST);
-
+    //glEnable(GL_CULL_FACE);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
@@ -314,6 +316,14 @@ int main(int argc, char *argv[])
     glGenerateMipmap(GL_TEXTURE_2D);
     stbi_image_free(ghost_data);
 
+    // do stuff for text
+    int text_program;
+    if (init_text(&text_program) < 0) {
+        printf("Failed to load text module!\n");
+        glfwTerminate();
+        return -1;
+    }
+ 
     // TODO move these into config file??
     int time_secI = 0, num_frames = 1;
     float time_sec;
@@ -333,13 +343,16 @@ int main(int argc, char *argv[])
         ghosts.push_back(new Ghost(xmin_wall, xmax_wall, zmin_wall, zmax_wall));
     }
 
-    player->mouse_callback(window, WINDOWWIDTH/2, WINDOWHEIGHT/2);
+    player->mouse_callback(window, WINDOWWIDTH, WINDOWHEIGHT);
+
+    int FPS = -1;
 
     while (!glfwWindowShouldClose(window))
     {
         float current_frame = static_cast<float>(glfwGetTime());
         int current_frameI = (int)current_frame;
-        if (current_frameI != time_secI) {
+        if (current_frameI != time_secI) {  // show stats every second
+            FPS = num_frames;
             glm::vec3 player_pos = player->get_position();
             float yaw, pitch;
             yaw = player->get_yaw();
@@ -358,7 +371,7 @@ int main(int argc, char *argv[])
             if (trail_sz < trailmax) {
                 trail_sz++;
             }
-        } else {
+        } else { // otherwise increase number of frames
             num_frames++;
         }
         timed = current_frame - last_frame;
@@ -461,6 +474,15 @@ int main(int argc, char *argv[])
             set_uniform(ghost_program, modelC, ghost_model);
             glBindVertexArray(ghostVAO);
             glDrawArrays(GL_TRIANGLES, 0, (3 + 3 + 2) * 6);
+        }
+
+        if (FPS != -1) {
+            glUseProgram(text_program);
+            projection = glm::ortho(0.0f, static_cast<float>(WINDOWWIDTH), 0.0f, static_cast<float>(WINDOWHEIGHT));
+            set_uniform(text_program, projectionC, projection);
+            char fps_buff[256];
+            sprintf(fps_buff, "FPS: %d", FPS);
+            render_text(text_program, std::string(fps_buff), 25.0F, WINDOWHEIGHT - 35.0f, 0.5f, glm::vec3(1.0f, 0.0f, 0.0f));
         }
 
         player->apply_movement(timed);
