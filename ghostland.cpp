@@ -1,9 +1,9 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <glad/glad.h>
+#include "glad/glad.h"
 #include <GLFW/glfw3.h>
 
-#include <stb_image.h>
+#include "stb_image.h"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -343,7 +343,7 @@ int main(int argc, char *argv[])
         ghosts.push_back(new Ghost(xmin_wall, xmax_wall, zmin_wall, zmax_wall));
     }
 
-    player->mouse_callback(window, WINDOWWIDTH, WINDOWHEIGHT);
+    player->mouse_callback(window, 0.0f, WINDOWHEIGHT);
 
     int FPS = -1;
 
