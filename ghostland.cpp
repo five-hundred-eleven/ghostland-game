@@ -480,7 +480,7 @@ int main(int argc, char *argv[]) {
                 return a_dist2 < b_dist2;
             }
         } ghost_compare;
-        std::sort(ghosts.begin(), ghosts.end(), ghost_compare);
+        std::partial_sort(ghosts.begin(), ghosts.begin() + ghosts.size() / 5, ghosts.end(), ghost_compare);
         for (int i = ghosts.size()/5; i >= 0; i--) {
             glm::mat4 ghost_model = ghosts[i]->get_model(camera_pos);
             ghosts[i]->apply_movement(current_frame, timed);
