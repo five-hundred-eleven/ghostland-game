@@ -22,27 +22,27 @@ Player::Player(glm::vec3 startpos, float startyaw) {
 
 }
 
-glm::vec3 Player::get_position() {
+glm::vec3 Player::get_pos() const {
     return position;
 }
 
-glm::vec3 Player::get_camera_front() {
+glm::vec3 Player::get_camera_front() const {
     return camera_front;
 }
 
-glm::vec3 Player::get_camera_up() {
+glm::vec3 Player::get_camera_up() const {
     return camera_up;
 }
 
-glm::vec3 Player::get_camera_pos() {
+glm::vec3 Player::get_camera_pos() const {
     return position + camera_offset;
 }
 
-glm::vec3 Player::get_light_pos() {
+glm::vec3 Player::get_light_pos() const {
     return get_camera_pos() + get_light_front() * armlength;
 }
 
-glm::vec3 Player::get_light_front() {
+glm::vec3 Player::get_light_front() const {
     float yawp = yaw + light_xpersist;
     float pitchp = pitch + light_ypersist;
     glm::vec3 front;
@@ -318,3 +318,4 @@ void Player::scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
         fov = 90.0f;
     }
 }
+

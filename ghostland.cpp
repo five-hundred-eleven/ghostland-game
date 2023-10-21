@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <stdlib.h>
 #include <stdio.h>
 #include "glad/glad.h"
@@ -60,8 +61,7 @@ float *wall_vertices;
 
 int trailmax = 1800;
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
 
     int success;
     glm::vec3 position;
@@ -343,7 +343,7 @@ int main(int argc, char *argv[])
         ghosts.push_back(new Ghost(xmin_wall, xmax_wall, zmin_wall, zmax_wall));
     }
 
-    player->mouse_callback(window, 0.0f, WINDOWHEIGHT);
+    player->mouse_callback(window, WINDOWWIDTH/2, WINDOWHEIGHT);
 
     int FPS = -1;
 
@@ -353,7 +353,7 @@ int main(int argc, char *argv[])
         int current_frameI = (int)current_frame;
         if (current_frameI != time_secI) {  // show stats every second
             FPS = num_frames;
-            glm::vec3 player_pos = player->get_position();
+            glm::vec3 player_pos = player->get_pos();
             float yaw, pitch;
             yaw = player->get_yaw();
             pitch = player->get_pitch();
@@ -468,7 +468,20 @@ int main(int argc, char *argv[])
 
         set_uniform(ghost_program, projectionC, projection);
         set_uniform(ghost_program, viewC, view);
-        for (int i = 0; i < ghosts.size(); i++) {
+
+        struct {
+            bool operator()(const Ghost *a, const Ghost *b) const {
+                glm::vec3 a_diff, b_diff;
+                a_diff = player->get_pos() - a->get_pos();
+                b_diff = player->get_pos() - b->get_pos();
+                float a_dist2, b_dist2;
+                a_dist2 = a_diff.x * a_diff.x + a_diff.y * a_diff.y + a_diff.z * a_diff.z;
+                b_dist2 = b_diff.x * b_diff.x + b_diff.y * b_diff.y + b_diff.z * b_diff.z;
+                return a_dist2 < b_dist2;
+            }
+        } ghost_compare;
+        std::sort(ghosts.begin(), ghosts.end(), ghost_compare);
+        for (int i = ghosts.size()/5; i >= 0; i--) {
             glm::mat4 ghost_model = ghosts[i]->get_model(camera_pos);
             ghosts[i]->apply_movement(current_frame, timed);
             set_uniform(ghost_program, modelC, ghost_model);

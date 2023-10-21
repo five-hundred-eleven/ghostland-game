@@ -107,3 +107,7 @@ float rand_float(float rmin, float rmax) {
     float res = (float)rand()/(float)RAND_MAX;
     return res * rdiff + rmin;
 }
+
+glm::vec3 Ghost::get_pos() const {
+    return pos;
+}

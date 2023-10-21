@@ -6,6 +6,7 @@
 #include <string>
 
 #include "collisions.h"
+#include "ghost.h"
 
 const float lightoffsetmax = 15.0;
 const float light_persist_factor = 0.99;
@@ -24,12 +25,12 @@ class Player {
         int num_walls;
         float *wall_vertices;
 
-        glm::vec3 get_position();
-        glm::vec3 get_camera_front();
-        glm::vec3 get_camera_up();
-        glm::vec3 get_camera_pos();
-        glm::vec3 get_light_pos();
-        glm::vec3 get_light_front();
+        glm::vec3 get_pos() const;
+        glm::vec3 get_camera_front() const;
+        glm::vec3 get_camera_up() const;
+        glm::vec3 get_camera_pos() const;
+        glm::vec3 get_light_pos() const;
+        glm::vec3 get_light_front() const;
         float get_yaw();
         float get_pitch();
         float get_fov();
@@ -39,6 +40,8 @@ class Player {
         void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
         bool is_in_air();
         void apply_movement(float timed);
+
+        bool operator()(const Ghost &a, const Ghost &b) const;
 
     private:
         float yaw;

@@ -8,6 +8,7 @@ class Ghost {
         Ghost(float xmin, float xmax, float zmin, float zmax);
         void apply_movement(float curr_time, float timed);
         glm::mat4 get_model(glm::vec3 &camera_pos);
+        glm::vec3 get_pos() const;
 
     private:
         int ghost_id;
