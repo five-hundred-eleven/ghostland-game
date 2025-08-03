@@ -40,6 +40,7 @@ class Player {
         void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
         bool is_in_air();
         void apply_movement(float timed);
+        void reset_position(glm::vec3 startpos, float startyaw);
 
         bool operator()(const Ghost &a, const Ghost &b) const;
 

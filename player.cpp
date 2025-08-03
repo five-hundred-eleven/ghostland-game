@@ -250,6 +250,12 @@ void Player::apply_movement(float timed) {
 
 }
 
+void Player::reset_position(glm::vec3 startpos, float startyaw) {
+    position = startpos;
+    yaw = startyaw;
+    velocity = glm::vec3(0.0f, 0.0f, 0.0f);
+}
+
 glm::vec3 Player::get_normal_from_index(int ix) {
     return glm::vec3(
         wall_vertices[ix * 6 * 6 + 3],

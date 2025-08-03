@@ -9,6 +9,8 @@ class Ghost {
         void apply_movement(float curr_time, float timed);
         glm::mat4 get_model(glm::vec3 &camera_pos);
         glm::vec3 get_pos() const;
+        void reverse_direction_from_position(glm::vec3 target_pos);
+        void regenerate_position();
 
     private:
         int ghost_id;

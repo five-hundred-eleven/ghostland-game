@@ -20,6 +20,7 @@
 #include "shader.h"
 #include "ghost.h"
 #include "text.h"
+#include "config.h"
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
@@ -38,7 +39,7 @@ bool first_frame = false;
 float timed = 0.0f;
 float last_frame = 0.0f;
 
-float camera_speed = 10.0f;
+float camera_speed = 20.0f;
 
 const char *projectionC = "projection";
 const char *viewC = "view";
@@ -59,12 +60,18 @@ const char *specularC = "light.specular";
 int num_walls;
 float *wall_vertices;
 
-int trailmax = 1800;
+int trailmax = 500;
 
 int main(int argc, char *argv[]) {
 
     int success;
     glm::vec3 position;
+    glm::vec3 start_position;
+    float start_yaw;
+
+    // Load configuration
+    Config::loadFromFile("ghostland.json");
+    camera_speed = Config::getFloat("camera_speed", camera_speed);
 
     FILE *fp = fopen("maze.txt", "r");
     float yaw;
@@ -72,6 +79,8 @@ int main(int argc, char *argv[]) {
         printf("1st fscanf failed.\n");
         return -1;
     }
+    start_position = position;
+    start_yaw = yaw;
     player = new Player(position, yaw);
     if (fscanf(fp, "%d\n", &num_walls) == EOF) {
         printf("2nd fscanf failed.\n");
@@ -151,8 +160,11 @@ int main(int argc, char *argv[]) {
 
     WINDOWWIDTH = monitor_mode->width;
     WINDOWHEIGHT = monitor_mode->height;
+    //WINDOWWIDTH = 1280;
+    //WINDOWHEIGHT = 960;
 
     GLFWwindow* window = glfwCreateWindow(WINDOWWIDTH, WINDOWHEIGHT, "Ghostland!", monitor, NULL);
+    //GLFWwindow* window = glfwCreateWindow(WINDOWWIDTH, WINDOWHEIGHT, "Ghostland!", NULL, NULL);
     if (window == NULL)
     {
         printf("Failed to create GLFW window.\n");
@@ -340,7 +352,14 @@ int main(int argc, char *argv[]) {
 
     std::vector<Ghost *> ghosts;
     for (int i = 0; i < 800; i++) {
-        ghosts.push_back(new Ghost(xmin_wall, xmax_wall, zmin_wall, zmax_wall));
+        Ghost *ghost = new Ghost(xmin_wall, xmax_wall, zmin_wall, zmax_wall);
+        
+        // Ensure ghost is not within 30.0 units of start_position
+        while (glm::length(ghost->get_pos() - start_position) <= 30.0f) {
+            ghost->regenerate_position();
+        }
+        
+        ghosts.push_back(ghost);
     }
 
     player->mouse_callback(window, WINDOWWIDTH/2, WINDOWHEIGHT);
@@ -409,6 +428,37 @@ int main(int argc, char *argv[]) {
         glm::vec3 light_front = player->get_light_front();
         //printf("light_pos: (%f, %f, %f)\n", light_front.x, light_front.y, light_front.z);
 
+        // Sort ghosts by distance to player for optimization
+        glm::vec3 player_pos = player->get_pos();
+        struct {
+            bool operator()(const Ghost *a, const Ghost *b) const {
+                glm::vec3 a_diff, b_diff;
+                a_diff = player->get_pos() - a->get_pos();
+                b_diff = player->get_pos() - b->get_pos();
+                float a_dist, b_dist;
+                a_dist = glm::length(a_diff);
+                b_dist = glm::length(b_diff);
+                return a_dist < b_dist;
+            }
+        } ghost_compare;
+        std::partial_sort(ghosts.begin(), ghosts.begin() + ghosts.size() / 5, ghosts.end(), ghost_compare);
+        
+        // Calculate nearest ghost distance (first ghost is now closest)
+        float nearest_ghost_distance = glm::length(ghosts[0]->get_pos() - player_pos);
+        
+        // Interpolate flashlight color based on nearest ghost distance
+        // At 30.0+ units: (0.61, 0.60, 0.59) - normal color
+        // At 10.0 units: (0.99, 0.60, 0.59) - red shift
+        float color_factor = 1.0f;
+        if (nearest_ghost_distance < 30.0f) {
+            color_factor = (nearest_ghost_distance - 10.0f) / (30.0f - 10.0f);
+            color_factor = glm::clamp(color_factor, 0.0f, 1.0f);
+        }
+        
+        glm::vec3 normal_color = glm::vec3(0.61f, 0.60f, 0.59f);
+        glm::vec3 danger_color = glm::vec3(0.99f, 0.60f, 0.59f);
+        diffuse = glm::mix(danger_color, normal_color, color_factor);
+
         // fragment requirements
         set_uniform(wall_program, viewposC, camera_pos);
         set_uniform(wall_program, shininessC, wall_shininess);
@@ -468,22 +518,24 @@ int main(int argc, char *argv[]) {
 
         set_uniform(ghost_program, projectionC, projection);
         set_uniform(ghost_program, viewC, view);
-
-        struct {
-            bool operator()(const Ghost *a, const Ghost *b) const {
-                glm::vec3 a_diff, b_diff;
-                a_diff = player->get_pos() - a->get_pos();
-                b_diff = player->get_pos() - b->get_pos();
-                float a_dist2, b_dist2;
-                a_dist2 = a_diff.x * a_diff.x + a_diff.y * a_diff.y + a_diff.z * a_diff.z;
-                b_dist2 = b_diff.x * b_diff.x + b_diff.y * b_diff.y + b_diff.z * b_diff.z;
-                return a_dist2 < b_dist2;
-            }
-        } ghost_compare;
-        std::partial_sort(ghosts.begin(), ghosts.begin() + ghosts.size() / 5, ghosts.end(), ghost_compare);
         for (int i = ghosts.size()/5; i >= 0; i--) {
             glm::mat4 ghost_model = ghosts[i]->get_model(camera_pos);
             ghosts[i]->apply_movement(current_frame, timed);
+            
+            // Check if ghost is within 10.0 units of player
+            glm::vec3 ghost_pos = ghosts[i]->get_pos();
+            glm::vec3 player_pos = player->get_pos();
+            float distance = glm::length(ghost_pos - player_pos);
+            if (distance <= 10.0f) {
+                player->reset_position(start_position, start_yaw);
+            }
+            
+            // Check if ghost is within 30.0 units of start_position
+            float start_distance = glm::length(ghost_pos - start_position);
+            if (start_distance <= 30.0f) {
+                ghosts[i]->reverse_direction_from_position(start_position);
+            }
+            
             set_uniform(ghost_program, modelC, ghost_model);
             glBindVertexArray(ghostVAO);
             glDrawArrays(GL_TRIANGLES, 0, (3 + 3 + 2) * 6);

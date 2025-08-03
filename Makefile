@@ -3,8 +3,8 @@ CFLAGS := -std=c++17 -O3
 LDFLAGS := -ldl -lglfw
 INCLUDES := -I/usr/include/freetype2/ -I/usr/include/libpng16
 
-ghostland: glad.o ghostland.o stb_image.o collisions.o player.o shader.o ghost.o text.o
-	$(CC) -o ghostland glad.o ghostland.o stb_image.o collisions.o player.o shader.o ghost.o text.o /usr/lib/x86_64-linux-gnu/libfreetype.so $(LDFLAGS) $(CFLAGS)
+ghostland: glad.o ghostland.o stb_image.o collisions.o player.o shader.o ghost.o text.o config.o
+	$(CC) -o ghostland glad.o ghostland.o stb_image.o collisions.o player.o shader.o ghost.o text.o config.o /usr/lib/x86_64-linux-gnu/libfreetype.so $(LDFLAGS) $(CFLAGS)
 
 glad.o: glad.c
 	$(CC) -c -o glad.o glad.c $(CFLAGS)
@@ -29,6 +29,9 @@ ghost.o: ghost.cpp ghost.h
 
 text.o: text.cpp text.h
 	$(CC) -c -o text.o text.cpp $(CFLAGS) $(INCLUDES)
+
+config.o: config.cpp config.h
+	$(CC) -c -o config.o config.cpp $(CFLAGS)
 
 clean:
 	rm -f *.o ghostland

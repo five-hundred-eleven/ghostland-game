@@ -111,3 +111,15 @@ float rand_float(float rmin, float rmax) {
 glm::vec3 Ghost::get_pos() const {
     return pos;
 }
+
+void Ghost::reverse_direction_from_position(glm::vec3 target_pos) {
+    // Calculate direction from target_pos to ghost position
+    glm::vec3 direction = pos - target_pos;
+    // Set yawr to point directly away from target_pos
+    yawr = atan2(direction.x, direction.z);
+}
+
+void Ghost::regenerate_position() {
+    pos.x = rand_float(xmin, xmax);
+    pos.z = rand_float(zmin, zmax);
+}
